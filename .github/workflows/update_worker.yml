@@ -2,7 +2,7 @@ name: Update and Obfuscate Worker
 
 on:
   schedule:
-    - cron: '0 3 * * 1'
+    - cron: '0 3 * * 1'   # 每周一 UTC 03:00
   workflow_dispatch:
 
 permissions:
@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: worker-update
-  cancel-in-progress: true   # 防止重复运行冲突
+  cancel-in-progress: true
 
 jobs:
   update-and-obfuscate:
@@ -20,9 +20,9 @@ jobs:
       - name: Checkout 仓库
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # ⭐必须：避免 git 历史问题
+          fetch-depth: 0
 
-      - name: 设置 Node.js 环境
+      - name: 设置 Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -34,13 +34,11 @@ jobs:
           sudo apt-get install -y jq curl
 
       - name: 获取最新 release tag
-        id: get_release
         run: |
           latest_tag=$(curl -s https://api.github.com/repos/bia-pain-bache/BPB-Worker-Panel/releases/latest | jq -r '.tag_name')
           echo "latest_tag=$latest_tag" >> $GITHUB_ENV
 
-      - name: 读取当前版本号
-        id: read_version
+      - name: 读取当前版本
         run: |
           if [ -f "version.txt" ]; then
             current_version=$(tr -d '\n\r' < version.txt)
@@ -49,22 +47,27 @@ jobs:
           fi
           echo "current_version=$current_version" >> $GITHUB_ENV
 
-      - name: 判断是否更新
-        id: check_update
+      - name: 判断是否需要更新
         run: |
           if [ "$current_version" = "$latest_tag" ]; then
             echo "need_update=false" >> $GITHUB_ENV
+            echo "✅ 已是最新版本"
           else
             echo "need_update=true" >> $GITHUB_ENV
+            echo "🚀 需要更新"
           fi
 
-      # ⭐只有需要更新才执行后续步骤
-      - name: 下载最新版 worker.js
+      # =============================
+      # 只有需要更新才执行下面步骤
+      # =============================
+
+      - name: 下载 worker.js
         if: env.need_update == 'true'
         run: |
-          curl -L -o origin.js "https://github.com/bia-pain-bache/BPB-Worker-Panel/releases/download/${{ env.latest_tag }}/worker.js"
+          curl -L -o origin.js \
+          "https://github.com/bia-pain-bache/BPB-Worker-Panel/releases/download/${{ env.latest_tag }}/worker.js"
 
-      - name: 混淆 JS 代码
+      - name: 混淆 JS
         if: env.need_update == 'true'
         run: |
           javascript-obfuscator origin.js --output _worker.js \
@@ -76,19 +79,27 @@ jobs:
             --self-defending false \
             --simplify true
 
-          echo "// Auto obfuscated at $(date -u)" >> _worker.js
-
-      - name: 更新 version.txt
+      - name: 更新版本文件
         if: env.need_update == 'true'
         run: echo "${{ env.latest_tag }}" > version.txt
 
-      # ⭐关键修复：先同步再提交
-      - name: 同步远程代码
+      - name: 检查是否真的有变更（防止空提交）
         if: env.need_update == 'true'
+        run: |
+          if git diff --quiet; then
+            echo "no_changes=true" >> $GITHUB_ENV
+            echo "⚠️ 没有实际变更"
+          else
+            echo "no_changes=false" >> $GITHUB_ENV
+            echo "✅ 检测到变更"
+          fi
+
+      - name: 同步远程仓库（关键）
+        if: env.need_update == 'true' && env.no_changes == 'false'
         run: git pull --rebase origin main
 
-      - name: 提交更改
-        if: env.need_update == 'true'
+      - name: 提交并推送
+        if: env.need_update == 'true' && env.no_changes == 'false'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: |
