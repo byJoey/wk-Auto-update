@@ -1,4 +1,4 @@
-name = "wk-auto-update"
+name = "cscs-river-61fb"
 main = "_worker.js"
 compatibility_date = "2024-04-28"
 usage_model = "bundled"
