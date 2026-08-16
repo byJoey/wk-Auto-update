@@ -123,5 +123,5 @@ GitHub Actions 会每日 00:00（UTC 时间）自动运行：
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=byJoey/wk-Auto-update&type=Timeline)](https://www.star-history.com/#byJoey/wk-Auto-update&Timeline)
+[![Star History Chart](https://star-history.dera.page/svg?repos=byJoey/wk-Auto-update&type=Timeline)](https://star-history.dera.page/#byJoey/wk-Auto-update&Timeline)
 
